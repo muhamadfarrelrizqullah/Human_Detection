@@ -1,0 +1,5 @@
+video-playback/
+video-test/
+.venv/
+.ipynb_checkpoints/
+*.pt
