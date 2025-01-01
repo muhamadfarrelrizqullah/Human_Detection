@@ -136,7 +136,7 @@ try:
 
         if rest_start_time <= start_time.time() <= rest_end_time and confidence_score <= 50:
                 person_count = 0
-                print("Waktu istirahat: Melakukan Filter dengan Confidence dibawah 50")
+                print("Break time: Do Filter with Confidence below 50")
 
         # Write data to PostgreSQL database
         cursor.execute("""
