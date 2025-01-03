@@ -1,4 +1,4 @@
-import psycopg2 # type: ignore
+import psycopg2  # type: ignore
 
 # Create connection
 conn = psycopg2.connect(
@@ -11,7 +11,7 @@ conn = psycopg2.connect(
 cursor = conn.cursor()
 
 try:
-    # Create person count raw table
+    # Create person_counts table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS person_counts (
         frame INTEGER,
@@ -21,13 +21,27 @@ try:
     );
     """)
 
-    # Create person count max table
+    # Create person_count_max table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS person_count_max (
+        id SERIAL PRIMARY KEY,
         max_value INTEGER,
         start_time TIMESTAMP,
         end_time TIMESTAMP,
-        video_path VARCHAR
+        video_path VARCHAR,
+        cctv_id INTEGER,
+        job_id INTEGER
+    );
+    """)
+    
+    # Create loss_analysis table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS loss_analysis (
+        id SERIAL PRIMARY KEY,
+        hour_intime INTEGER,
+        hour_overtime INTEGER,
+        hour_loss INTEGER,
+        cctv_id INTEGER
     );
     """)
 
@@ -36,81 +50,46 @@ try:
     CREATE TABLE IF NOT EXISTS cctv (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255),
-        location VARCHAR(255),
-        rtsp_url VARCHAR(255)
+        rtsp_url VARCHAR(255),
+        work_center_id INTEGER
     );
     """)
-    
-    # Create failed job table
+
+    # Create job table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS job (
         id SERIAL PRIMARY KEY,
         job_message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
-    """)    
-
-    # Add cctv_id column in person count max table
-    cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='person_count_max' AND column_name='cctv_id') THEN
-            ALTER TABLE person_count_max ADD COLUMN cctv_id INTEGER;
-        END IF;
-    END
-    $$;
     """)
 
-    # Add constrain cctv_id
+    # Add constraints for foreign keys
     cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM information_schema.table_constraints
-            WHERE constraint_type = 'FOREIGN KEY'
-            AND table_name = 'person_count_max'
-            AND constraint_name = 'fk_cctv'
-        ) THEN
-            ALTER TABLE person_count_max
-            ADD CONSTRAINT fk_cctv
-            FOREIGN KEY (cctv_id) REFERENCES cctv(id);
-        END IF;
-    END
-    $$;
+    ALTER TABLE person_count_max
+    ADD CONSTRAINT fk_cctv
+    FOREIGN KEY (cctv_id) REFERENCES cctv(id);
     """)
     
-    # Add job_id column in person count max table
     cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='person_count_max' AND column_name='job_id') THEN
-            ALTER TABLE person_count_max ADD COLUMN job_id INTEGER;
-        END IF;
-    END
-    $$;
+    ALTER TABLE person_count_max
+    ADD CONSTRAINT fk_job
+    FOREIGN KEY (job_id) REFERENCES job(id);
     """)
     
-    # Add constrain job_id
     cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM information_schema.table_constraints
-            WHERE constraint_type = 'FOREIGN KEY'
-            AND table_name = 'person_count_max'
-            AND constraint_name = 'fk_job'
-        ) THEN
-            ALTER TABLE person_count_max
-            ADD CONSTRAINT fk_job
-            FOREIGN KEY (job_id) REFERENCES job(id);
-        END IF;
-    END
-    $$;
+    ALTER TABLE cctv
+    ADD CONSTRAINT fk_work_center
+    FOREIGN KEY (work_center_id) REFERENCES work_center(id);
+    """)
+    
+    cursor.execute("""
+    ALTER TABLE loss_analysis
+    ADD CONSTRAINT fk_cctv_loss_analysis
+    FOREIGN KEY (cctv_id) REFERENCES cctv(id);
     """)
 
-    conn.commit() 
+    conn.commit()
     print("Tables and constraints created successfully.")
 
 except psycopg2.Error as e:

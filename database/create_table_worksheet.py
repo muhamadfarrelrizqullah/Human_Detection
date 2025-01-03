@@ -1,4 +1,4 @@
-import psycopg2 # type: ignore
+import psycopg2  # type: ignore
 
 # Create connection
 conn = psycopg2.connect(
@@ -15,82 +15,69 @@ try:
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS project (
         id SERIAL PRIMARY KEY,
-        nama_ketua VARCHAR,
-        nama_projek VARCHAR,
+        leader_name VARCHAR,
+        project_name VARCHAR,
         start_time TIMESTAMP,
         end_time TIMESTAMP,
-        total_cost INTEGER
+        total_cost INTEGER,
+        plan_hour INTEGER,
+        progress INTEGER
     );
-    """)
-
-    # Create sub project table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS sub_project (
-        nama_pekerja VARCHAR,
-        start_time TIMESTAMP,
-        end_time TIMESTAMP,
-        cost INTEGER
-    );
-    """)
-
-    # Add project_id column in sub project table
-    cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='sub_project' AND column_name='project_id') THEN
-            ALTER TABLE sub_project ADD COLUMN project_id INTEGER;
-        END IF;
-    END
-    $$;
-    """)
-
-    # Add constrain project_id
-    cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM information_schema.table_constraints
-            WHERE constraint_type = 'FOREIGN KEY'
-            AND table_name = 'sub_project'
-            AND constraint_name = 'fk_project'
-        ) THEN
-            ALTER TABLE sub_project
-            ADD CONSTRAINT fk_project
-            FOREIGN KEY (project_id) REFERENCES project(id);
-        END IF;
-    END
-    $$;
     """)
     
-    # Add cctv_id column in project table
+    # Create work center table
     cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='project' AND column_name='cctv_id') THEN
-            ALTER TABLE project ADD COLUMN cctv_id INTEGER;
-        END IF;
-    END
-    $$;
+    CREATE TABLE IF NOT EXISTS work_center (
+        id SERIAL PRIMARY KEY,
+        workshop_name VARCHAR,
+        project_id INTEGER
+    );
+    """)
+    
+    # Create employee table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS employee (
+        id SERIAL PRIMARY KEY,
+        employee_name VARCHAR,
+        work_center_id INTEGER
+    );
+    """)
+    
+    # Create time sheet table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS time_sheet (
+        start_time TIMESTAMP,
+        end_time TIMESTAMP,
+        cost_per_hour INTEGER,
+        cost_total INTEGER,
+        work_center_id INTEGER,
+        employee_id INTEGER
+    );
     """)
 
-    # Add constrain cctv_id
+    # Add constraints for foreign keys
     cursor.execute("""
-    DO $$
-    BEGIN
-        IF NOT EXISTS (
-            SELECT 1
-            FROM information_schema.table_constraints
-            WHERE constraint_type = 'FOREIGN KEY'
-            AND table_name = 'project'
-            AND constraint_name = 'fk_cctv_project'
-        ) THEN
-            ALTER TABLE project
-            ADD CONSTRAINT fk_cctv_project
-            FOREIGN KEY (cctv_id) REFERENCES cctv(id);
-        END IF;
-    END
-    $$;
+    ALTER TABLE work_center
+    ADD CONSTRAINT fk_project
+    FOREIGN KEY (project_id) REFERENCES project(id);
+    """)
+
+    cursor.execute("""
+    ALTER TABLE employee
+    ADD CONSTRAINT fk_work_center_employee
+    FOREIGN KEY (work_center_id) REFERENCES work_center(id);
+    """)
+
+    cursor.execute("""
+    ALTER TABLE time_sheet
+    ADD CONSTRAINT fk_work_center_timesheet
+    FOREIGN KEY (work_center_id) REFERENCES work_center(id);
+    """)
+    
+    cursor.execute("""
+    ALTER TABLE time_sheet
+    ADD CONSTRAINT fk_employee_timesheet
+    FOREIGN KEY (employee_id) REFERENCES employee(id);
     """)
 
     conn.commit() 
