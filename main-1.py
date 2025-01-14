@@ -1,6 +1,6 @@
-import cv2 # type: ignoreAdd commentMore actions
-from ultralytics import YOLO # type: ignore
-import psycopg2 # type: ignore
+import cv2
+from ultralytics import YOLO
+import psycopg2
 from datetime import timedelta, datetime
 import time
 import os
@@ -57,7 +57,7 @@ try:
         ret, frame = cap.read()
         if not ret:
             print("Error: Could not read frame.")
-            break
+            continue
 
         # Resize frame
         frame = cv2.resize(frame, (frame_width, frame_height))
@@ -102,6 +102,17 @@ try:
         current_fps = frame_count / (time.time() - start_time.timestamp())
         cv2.putText(frame, f'FPS: {current_fps:.2f}', (10, 850),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+
+        # Write the frame with annotations to video file
+        out.write(frame)
+
+        # Filter Confidence
+        rest_start_time = datetime.strptime("11:20", "%H:%M").time()
+        rest_end_time = datetime.strptime("12:20", "%H:%M").time()
+
+        if rest_start_time <= start_time.time() <= rest_end_time and confidence_score <= 50:
+                person_count = 0
+                print("Break time: Do Filter with Confidence below 50")
 
         # Write data to PostgreSQL database
         cursor.execute("""
