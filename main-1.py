@@ -130,7 +130,18 @@ try:
 
     # Calculate and save max count that appears more than 15 times consecutively
     if person_counts:
-        max_person_count = max(person_counts)
+        max_person_count = None
+        consecutive_count = 1
+
+        for i in range(1, len(person_counts)):
+            if person_counts[i] == person_counts[i - 1]:
+                consecutive_count += 1
+            else:
+                consecutive_count = 1
+
+            if consecutive_count > 15:
+                if max_person_count is None or person_counts[i] > max_person_count:
+                    max_person_count = person_counts[i]
 
         if max_person_count is not None:
             cursor.execute("""
