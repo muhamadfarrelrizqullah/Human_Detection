@@ -1,9 +1,69 @@
+import subprocess
 import cv2
 from ultralytics import YOLO
 import psycopg2
 from datetime import timedelta, datetime
 import time
 import os
+import csv
+import paramiko
+
+# Download video function
+def download_playback_video(input_file, output_file, duration):
+    try:
+        ffmpeg_command = [
+            "ffmpeg", "-i", input_file, "-t", duration, "-c:v", "libx264", "-crf", "23", "-preset", "fast", "-c:a", "aac", output_file
+        ]
+        subprocess.run(ffmpeg_command, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error in downloading playback video: {e}")
+
+# Delete video function
+def delete_file(file_path):
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"File {file_path} has been deleted.")
+        else:
+            print(f"File {file_path} not found.")
+    except OSError as e:
+        print(f"Error deleting file {file_path}: {e}")
+
+# Upload video function
+def upload_file_to_server(local_file_path, remote_file_path):
+    try:
+        if not os.path.exists(local_file_path):
+            raise FileNotFoundError(f"File {local_file_path} not found")
+
+        ssh_host = 'localhost'
+        ssh_port = 22
+        ssh_user = 'user'
+        ssh_password = 'pw'
+
+        transport = paramiko.Transport((ssh_host, ssh_port))
+        transport.connect(username=ssh_user, password=ssh_password)
+
+        sftp = paramiko.SFTPClient.from_transport(transport)
+
+        remote_directory = os.path.dirname(remote_file_path)
+        try:
+            sftp.stat(remote_directory)
+        except FileNotFoundError:
+            print(f"Create directory remote : {remote_directory}")
+            sftp.mkdir(remote_directory)
+
+        print(f"Upload {local_file_path} to {remote_file_path}...")
+        sftp.put(local_file_path, remote_file_path)
+        print(f"File {local_file_path} has been uploaded at {remote_file_path}")
+
+        sftp.close()
+        transport.close()
+    except FileNotFoundError as e:
+        print(f"Error uploading file to server: {e}")
+    except paramiko.SSHException as e:
+        print(f"Error connection SSH: {e}")
+    except Exception as e:
+        print(f"Error uploading file to server: {e}")
 
 # load input and model
 try:
@@ -125,8 +185,16 @@ try:
         # Display the frame with annotations
         # cv2.imshow('Frame', frame)
 
+    # Close video writer
+    out.release()
+
     # Record end time
     end_time = datetime.now()
+
+    # Download the annotated video (1 minute clip from the recorded 10 minutes video)
+    download_duration = "00:01:00"
+    output_file_download = os.path.join(output_directory, f"download_{current_time}-1.mp4")
+    download_playback_video(output_file_playback, output_file_download, download_duration)
 
     # Calculate and save max count that appears more than 15 times consecutively
     if person_counts:
@@ -144,14 +212,33 @@ try:
                     max_person_count = person_counts[i]
 
         if max_person_count is not None:
+            video_filename = os.path.basename(output_file_download)
+            relative_video_path = f"playback/{video_filename}"
+
             cursor.execute("""
-            INSERT INTO person_count_max (max_value, start_time, end_time, cctv_id)
-            VALUES (%s, %s, %s, 1)
-            """, (max_person_count, start_time, end_time))
+            INSERT INTO job (job_message, created_at)
+            VALUES (%s, %s)
+            RETURNING id
+            """, (f"Success detect {max_person_count} at {end_time}", end_time))
+
+            successjob_id = cursor.fetchone()[0]
+            conn.commit()
+
+            cursor.execute("""
+            INSERT INTO person_count_max (max_value, start_time, end_time, video_path, job_id, cctv_id)
+            VALUES (%s, %s, %s, %s, %s, 1)
+            """, (max_person_count, start_time, end_time, relative_video_path, successjob_id))
             conn.commit()
             print(f"Maximum person count that appeared more than 15 times consecutively: {max_person_count}")
         else:
             print("No person count appeared more than 15 times consecutively.")
+
+    # Upload file to server
+    upload_file_to_server(output_file_download, 'Videos/playback/download_{}-1.mp4'.format(current_time))
+
+    # Delete file after upload
+    delete_file(output_file_playback)
+    delete_file(output_file_download)
 
     # Close connection
     cursor.close()
