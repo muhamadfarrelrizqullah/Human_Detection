@@ -193,7 +193,7 @@ try:
 
     # Download the annotated video (1 minute clip from the recorded 10 minutes video)
     download_duration = "00:01:00"
-    output_file_download = os.path.join(output_directory, f"download_{current_time}-1.mp4")
+    output_file_download = os.path.join(output_directory, f"download_{current_time}-2.mp4")
     download_playback_video(output_file_playback, output_file_download, download_duration)
 
     # Calculate and save max count that appears more than 15 times consecutively
@@ -247,5 +247,30 @@ try:
     cv2.destroyAllWindows()
 
 except Exception as e:
-    # Log error message to the console
-    print(f"Error occurred: {str(e)}")
+    # Log error in the database if an exception occurs
+    conn = psycopg2.connect(
+        dbname='worker_detection',
+        user='postgres',
+        password='admin@123',
+        host='localhost',
+        port='5432'
+    )
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    INSERT INTO job (job_message, created_at)
+    VALUES (%s, %s)
+    RETURNING id
+    """, (f"Error in the main script: {e}", datetime.now()))
+
+    failedjob_id = cursor.fetchone()[0]
+    conn.commit()
+
+    cursor.execute("""
+    INSERT INTO person_count_max (max_value, start_time, end_time, job_id, cctv_id)
+    VALUES (%s, %s, %s, %s, 1)
+    """, (0, datetime.now(), datetime.now(), failedjob_id))
+    conn.commit()
+
+    cursor.close()
+    conn.close()
