@@ -97,10 +97,23 @@ try:
         )
         result_plan_hour = cursor.fetchone()
         plan_hour = result_plan_hour[0] if result_plan_hour else 0
+        
+        # Execute the query once to get progress
+        cursor.execute(
+            """
+            SELECT progress
+            FROM project p
+            inner join work_center wc on wc.project_id = p.id 
+            inner join cctv c on c.work_center_id = wc.id 
+            where c.id = 1;
+            """
+        )
+        result_progress = cursor.fetchone()
+        progress = result_progress[0] if result_progress else 0
 
         if total_cost > 0:
             average_cost = round(total_cost / worker_count, 2)
-            expected_progress = round((worker_count / plan_hour) * 100, 2)
+            expected_progress = progress + (round((worker_count / plan_hour) * 100, 2))
         
             if worker_count < max_person_count:
                 print("\nOvertime calculation")
@@ -174,6 +187,19 @@ try:
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1);
                     """,
                     (max_person_count, worker_count, hour_intime, hour_overtime, hour_loss, overtime_cost, loss_cost, expected_progress, total_progress, start_of_hour)
+                )
+                conn.commit()
+                
+                # Update data project
+                cursor.execute(
+                    """
+                    UPDATE project p
+                    SET progress = %s
+                    FROM work_center wc
+                    JOIN cctv c ON c.work_center_id = wc.id
+                    WHERE wc.project_id = p.id AND c.id = 1;
+                    """,
+                    (total_progress,)
                 )
                 conn.commit()
                 print("\nData successfully inserted into loss_analysis table")
