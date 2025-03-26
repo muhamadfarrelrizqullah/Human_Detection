@@ -66,7 +66,7 @@ try:
     hour_overtime = 0
     hour_loss = 0
 
-    if max_person_count is not None:
+    if max_person_count is not None and max_person_count > 0:
         # Execute the query once to get total cost per hour
         cursor.execute(
             """
@@ -111,7 +111,7 @@ try:
         result_progress = cursor.fetchone()
         progress = result_progress[0] if result_progress else 0
 
-        if total_cost > 0:
+        if total_cost is not None and total_cost > 0:
             average_cost = round(total_cost / worker_count, 2)
             expected_progress = progress + (round((worker_count / plan_hour) * 100, 2))
         
@@ -168,18 +168,7 @@ try:
                 overtime_cost = 0
                 loss_cost = 0
             
-            try:
-                if start_of_hour.hour == 11:
-                    max_person_count = 0
-                    worker_count = 0
-                    hour_intime = 0
-                    hour_loss = 0
-                    hour_overtime = 0
-                    overtime_cost = 0
-                    loss_cost = 0
-                    expected_progress = 0
-                    total_progress = 0
-                    
+            try:    
                 # Insert data to database
                 cursor.execute(
                     """
@@ -205,6 +194,8 @@ try:
                 print("\nData successfully inserted into loss_analysis table")
             except psycopg2.Error as e:
                 print(f"\nError inserting data into loss_analysis table: {e}")
+        else:
+                print("No cost avaible.")
     else:
         print("No data available.")
 
