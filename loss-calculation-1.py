@@ -24,8 +24,7 @@ try:
         """
         SELECT MAX(max_value) AS max_person_count
         FROM person_count_max
-        WHERE ((start_time >= %s AND start_time < %s)
-            AND (end_time > %s AND end_time <= %s))
+        WHERE (end_time > %s AND end_time <= %s)
             and cctv_id = 1;
         """,
         (start_of_hour, end_of_hour, start_of_hour, end_of_hour)
